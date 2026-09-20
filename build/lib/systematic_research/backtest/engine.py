@@ -12,17 +12,9 @@ class BacktestEngine:
     Vectorized backtesting engine supporting portfolios, 
     transaction costs, and strict boundary controls.
     """
-    def __init__(self, data: Union[pd.DataFrame, any], initial_capital: float = 100000.0, 
+    def __init__(self, data: pd.DataFrame, initial_capital: float = 100000.0, 
                  commission: float = 0.0, slippage: float = 0.0):
-        # Normalize data to a pandas DataFrame for consistency
-        if hasattr(data, 'close') and isinstance(data.close, pd.DataFrame):
-            self.data = data.close
-        elif isinstance(data, pd.DataFrame):
-            self.data = data
-        else:
-            raise TypeError("Data must be a pandas DataFrame or a wrapper with a '.close' DataFrame attribute")
-            
-        self.data = self.data.sort_index()
+        self.data = data.sort_index() if hasattr(data, 'sort_index') else data
         self.initial_capital = initial_capital
         self.commission = commission 
         self.slippage = slippage
@@ -32,19 +24,34 @@ class BacktestEngine:
         signals = strategy.generate_signal(self.data)
         
         if allocator:
+            # Map signals to weights using the allocator
             weights = allocator.allocate(signals)
         else:
+            # Default to equal weight of active signals
             active_count = signals.sum(axis=1)
             weights = signals.div(active_count, axis=0).fillna(0)
 
+        # Prevent look-ahead bias: Weights at t are applied to returns at t+1
         execution_weights = weights.shift(1).fillna(0)
         
-        # Compute asset returns
-        # Since self.data is now guaranteed to be a DataFrame of prices
-        asset_returns = self.data.pct_change()
+        # Asset returns
+        if isinstance(self.data, pd.DataFrame) and 'close' in self.data.columns:
+             # Handle single-asset case if 'close' is a column
+             asset_returns = self.data['close'].pct_change().to_frame()
+        elif hasattr(self.data, 'close'):
+             # Handle the wrapper case used in examples
+             if isinstance(self.data.close, pd.DataFrame):
+                 asset_returns = self.data.close.pct_change()
+             else:
+                 asset_returns = self.data.close.pct_change().to_frame()
+        else:
+            # Fallback: assume the data itself is the price DF
+            asset_returns = self.data.pct_change()
 
+        # Portfolio returns: sum(weight_i * return_i)
         portfolio_returns = (execution_weights * asset_returns).sum(axis=1)
         
+        # Transaction costs: apply when weights change
         weight_change = execution_weights.diff().abs().sum(axis=1).fillna(0)
         costs = weight_change * (self.commission + self.slippage)
         
@@ -61,5 +68,3 @@ class BacktestEngine:
             "sharpe_ratio": sharpe,
             "max_drawdown": max_dd
         }
-
-from typing import Union
