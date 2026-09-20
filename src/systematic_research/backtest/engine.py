@@ -56,7 +56,7 @@ class BacktestEngine:
         sharpe = (returns.mean() / returns.std()) * np.sqrt(252) if returns.std() != 0 else 0
         max_dd = (equity_curve / equity_curve.cummax() - 1).min()
         return {
-            "cumulative_return": (equity_curve[-1] / self.initial_capital) - 1,
+            "cumulative_return": (equity_curve.iloc[-1] / self.initial_capital) - 1,
             "sharpe_ratio": sharpe,
             "max_drawdown": max_dd
         }
