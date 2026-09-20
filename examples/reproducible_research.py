@@ -11,11 +11,9 @@ class MultiAssetMAStrategy:
         self.signal_gen = MovingAverageCrossover()
 
     def generate_signal(self, data):
-        # Assume data is a DataFrame of prices for multiple assets
-        # Return a DataFrame of signals
+        # data is now guaranteed to be a DataFrame of prices
         signals = pd.DataFrame(index=data.index)
         for col in data.columns:
-            # Create a temporary DF for the signal generator
             temp_df = data[[col]].rename(columns={col: 'close'})
             signals[col] = self.signal_gen.generate(temp_df)
         return signals
@@ -23,7 +21,6 @@ class MultiAssetMAStrategy:
 def run_reproducible_example():
     print("Generating synthetic multi-asset data...")
     dates = pd.date_range("2023-01-01", periods=500)
-    assets = ['ASSET_A', 'ASSET_B', 'ASSET_C']
     
     # Create synthetic prices with different volatilities
     np.random.seed(42)
@@ -34,21 +31,8 @@ def run_reproducible_example():
     }
     df_prices = pd.DataFrame(data_dict, index=dates)
     
-    # We wrap the price DF in a way the engine expects (data['close'] as a DF)
-    # In the current engine, we can just pass the price DF as the 'data' and 
-    # modify the engine slightly or pass it as a dictionary.
-    # Let's use a helper class to simulate the data structure.
-    class PriceData:
-        def __init__(self, df):
-            self.close = df
-            self.index = df.index
-        def sort_index(self):
-            return self
-            
-    data_wrapper = PriceData(df_prices)
-    
     # 1. Initialize Engine & Strategy
-    engine = BacktestEngine(data_wrapper, commission=0.0001)
+    engine = BacktestEngine(df_prices, commission=0.0001)
     strategy = MultiAssetMAStrategy()
     allocator = RiskParityAllocator()
     
