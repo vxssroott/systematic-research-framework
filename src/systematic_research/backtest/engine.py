@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Protocol, Optional
+from typing import Protocol, Optional, Union
 from ..portfolio.allocator import PortfolioAllocator
 
 class Strategy(Protocol):
@@ -28,7 +28,7 @@ class BacktestEngine:
         self.slippage = slippage
 
     def run(self, strategy: Strategy, allocator: Optional[PortfolioAllocator] = None):
-        # generate_signal now returns a DataFrame of signals per asset
+        # Pass the normalized DataFrame (self.data) to the strategy
         signals = strategy.generate_signal(self.data)
         
         if allocator:
@@ -39,8 +39,7 @@ class BacktestEngine:
 
         execution_weights = weights.shift(1).fillna(0)
         
-        # Compute asset returns
-        # Since self.data is now guaranteed to be a DataFrame of prices
+        # Compute asset returns from normalized data
         asset_returns = self.data.pct_change()
 
         portfolio_returns = (execution_weights * asset_returns).sum(axis=1)
@@ -61,5 +60,3 @@ class BacktestEngine:
             "sharpe_ratio": sharpe,
             "max_drawdown": max_dd
         }
-
-from typing import Union
